@@ -17,17 +17,21 @@
                             <i class="bi bi-x-circle remove-button"></i>
 
                             <div class="profile-img-wrap edit-img">
-                                @if(Auth::user()->avatar)
-                                    <img class="inline-block" src="{{Storage::url('public/'.Auth::user()->avatar)}}" alt="user-profile">
-                                @else
-                                    <img class="inline-block"  alt="user-profile" src="{{asset('img/OIP.png')}}" alt="user-profile"></a>
-                                @endif
+    @if(Auth::user()->avatar)
+        <!-- Vérifier si l'utilisateur a un avatar et l'afficher -->
+        <img class="inline-block" src="{{ asset('storage/avatars/' . Auth::user()->avatar) }}" alt="user-profile">
+    @else
+        <!-- Si aucun avatar, afficher l'image par défaut -->
+        <img class="inline-block" alt="user-profile" src="{{ asset('img/MoMo.jpg') }}">
+    @endif
 
-                                <div class="fileupload btn">
-                                    <span class="btn-text">edit</span>
-                                    <input class="upload" name="avatar" type="file" accept="image/png, image/gif, image/jpeg">
-                                </div>
-                            </div>
+    <!-- Section pour télécharger un avatar -->
+    <div class="fileupload btn">
+        <span class="btn-text">edit</span>
+        <input class="upload" name="avatar" type="file" accept="image/png, image/gif, image/jpeg">
+    </div>
+</div>
+
                         </div>
                         <div class="row">
                             <!-- <div class="col-md-6">
@@ -182,7 +186,7 @@
     removeButton.addEventListener('click', function() {
         var img = document.querySelector('.inline-block');
 
-        img.src = '{{asset("img/OIP.png")}}';
+        img.src = '{{asset("img/profiles/Yousef.jpg")}}';
         // Clear the file input value and reset the image source
         // fileInput.value = 'No image';
         check.value = "Somthing was happened";

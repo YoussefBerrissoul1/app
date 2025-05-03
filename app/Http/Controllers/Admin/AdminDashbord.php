@@ -40,29 +40,23 @@ class AdminDashbord extends Controller
 
     public function store(Request $request)
     {
-        // dd($request->input('check'));
-        // dd($request->file('avatar'));
-        // dd(Auth::user()->id);
-        // dd($user = User::findOrFail(Auth::user()->id));
-        // Get the authenticated user
         $user = auth()->user();
-        // // Validate the form data
+    
+        // Validation des données
         $validatedData = $request->validate([
             'name' => 'required',
             'bithdate' => 'required|date',
-            'avatar' => 'image|mimes:jpeg,png,jpg,gif|max:5048',
-            'email' => ['email',Rule::unique('users')->ignore($user->email, 'email')],
+            'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5048',
+            'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
             'adriss' => 'required',
             'city' => 'required',
             'contry' => 'required',
             'pinecode' => 'required',
             'phone' => 'required',
-            'password' => 'confirmed',
+            'password' => 'nullable|confirmed',
         ]);
-
-
-
-        // // Update the user's data
+    
+        // Mise à jour des champs
         $user->name = $request->input('name');
         $user->bithdate = $request->input('bithdate');
         $user->email = $request->input('email');
@@ -71,40 +65,42 @@ class AdminDashbord extends Controller
         $user->contry = $request->input('contry');
         $user->pinecode = $request->input('pinecode');
         $user->phone = $request->input('phone');
-
-        // // Update the password if provided
+    
+        // Mise à jour du mot de passe s’il est fourni
         if ($request->filled('password')) {
             $user->password = Hash::make($request->input('password'));
         }
-
-        // Handle the avatar image upload
-        if ($request->hasFile('avatar')){
-            // dd(auth()->user()->avatar);
-            // Delete image :
-            Storage::delete('public/'.auth()->user()->avatar);
-            // Get the file : img
+    
+        // Traitement de l'image de profil
+        if ($request->hasFile('avatar')) {
+            // Supprimer l’ancienne image si elle existe
+            if ($user->avatar && Storage::exists('public/' . $user->avatar)) {
+                Storage::delete('public/' . $user->avatar);
+            }
+    
+            // Stocker la nouvelle image
             $file = $request->file("avatar");
-            // Generate name :
-            $name = "avatar_".Carbon::now()->timestamp."_".auth()->user()->name."_".auth()->user()->id.".".$file->extension();
-            // Store img in public file
-            Storage::putFileAs('public/avatars',$file,$name);
-            // Store path in database
-            $user->avatar = 'avatars/'.$name;
-
-        }else if($request->input('check') === "No change"){
-            $user->avatar = auth()->user()->avatar;
+            $name = "avatar_" . time() . "_" . $user->id . "." . $file->extension();
+            Storage::putFileAs('public/avatars', $file, $name);
+            $user->avatar = 'avatars/' . $name;
+    
+        } elseif ($request->input('check') === "No change") {
+            // Conserver l’image actuelle
+            $user->avatar = $user->avatar;
+        } else {
+            // Supprimer l’image si non conservée et non remplacée
+            if ($user->avatar && Storage::exists('public/' . $user->avatar)) {
+                Storage::delete('public/' . $user->avatar);
+            }
+            $user->avatar = null;
         }
-        else{
-            Storage::delete('public/'.auth()->user()->avatar);
-            $user->avatar = '';
-        }
-
-        // Save the updated user data
+    
+        // Sauvegarde
         $user->save();
-
-        // // Redirect or return a response as needed
+    
         return redirect()->route("admin.profile")->with('success', 'Profile updated successfully');
     }
+    
 
     //data of client
     public function listclient(){

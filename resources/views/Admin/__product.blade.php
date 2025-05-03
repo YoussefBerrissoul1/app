@@ -49,14 +49,13 @@
         <!-- Spinner End -->
 
         @include("layout-Admin.sidebare")
-   
-       
+
     
         <!-- Content Start -->
             <div class="content">
 
                 @include("layout-Admin.navebare")
-                 @include("layout-Admin.Sale_Revenue")
+                @include("layout-Admin.Sale_Revenue")
                 {{--@include("layout-Admin.salesChart")
                 @include("layout-Admin.Recentsales")
                 @include("layout-Admin.Widgets")
