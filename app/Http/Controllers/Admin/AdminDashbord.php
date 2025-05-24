@@ -1,230 +1,210 @@
 <?php
 
 namespace App\Http\Controllers\Admin;
+
 use App\Http\Controllers\Controller;
-use App\Models\message;
-use App\Models\order;
+use App\Models\Message;
+use App\Models\Order;
 use App\Models\ProductModel;
-use Illuminate\Http\Request;
 use App\Models\User;
-use Auth;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+
 class AdminDashbord extends Controller
 {
-    public function index(){
-        $message =message::query()->select()->orderBy('created_at','desc')->get();
-        $orderliv=order::query()->select('id')->where('statuscmd','=','livree')->count();
-        $orders=order::query()->select('id')->where('statuscmd','=','En attente')->count();
-        $clients = User::Where("role","client")->count();
-        $products = ProductModel::select("*")->count();
-        // dd($clients);
-        // dd($products);
-        return view("Admin.main",["clients"=>$clients,"message"=>$message,"products"=>$products,'orderliv'=>$orderliv,'orders'=>$orders]);
-
+    public function index()
+    {
+        return view("Admin.main", [
+            "clients" => User::where("role", "client")->count(),
+            "message" => Message::latest()->get(),
+            "products" => ProductModel::count(),
+            'orderliv' => Order::where('statuscmd', 'livree')->count(),
+            'orders' => Order::where('statuscmd', 'En attente')->count()
+        ]);
     }
 
-    public function profile(){
-        $message =message::query()->select()->orderBy('created_at','desc')->get();
-        return view('user-profile.user-profile',['message'=>$message]);
+    public function profile()
+    {
+        return view('user-profile.user-profile', [
+            'message' => Message::latest()->get()
+        ]);
     }
 
-    public function edite(){
-        $message =message::query()->select()->orderBy('created_at','desc')->get();
-        return view("user-profile.edite-profile",['message'=>$message]);
+    public function edite()
+    {
+        return view("user-profile.edite-profile", [
+            'message' => Message::latest()->get()
+        ]);
     }
 
     public function store(Request $request)
-    {
-        $user = auth()->user();
-    
-        // Validation des données
-        $validatedData = $request->validate([
-            'name' => 'required',
-            'bithdate' => 'required|date',
-            'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5048',
-            'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
-            'adriss' => 'required',
-            'city' => 'required',
-            'contry' => 'required',
-            'pinecode' => 'required',
-            'phone' => 'required',
-            'password' => 'nullable|confirmed',
-        ]);
-    
-        // Mise à jour des champs
-        $user->name = $request->input('name');
-        $user->bithdate = $request->input('bithdate');
-        $user->email = $request->input('email');
-        $user->adriss = $request->input('adriss');
-        $user->city = $request->input('city');
-        $user->contry = $request->input('contry');
-        $user->pinecode = $request->input('pinecode');
-        $user->phone = $request->input('phone');
-    
-        // Mise à jour du mot de passe s’il est fourni
-        if ($request->filled('password')) {
-            $user->password = Hash::make($request->input('password'));
-        }
-    
-        // Traitement de l'image de profil
-        if ($request->hasFile('avatar')) {
-            // Supprimer l’ancienne image si elle existe
-            if ($user->avatar && Storage::exists('public/' . $user->avatar)) {
-                Storage::delete('public/' . $user->avatar);
-            }
-    
-            // Stocker la nouvelle image
-            $file = $request->file("avatar");
-            $name = "avatar_" . time() . "_" . $user->id . "." . $file->extension();
-            Storage::putFileAs('public/avatars', $file, $name);
-            $user->avatar = 'avatars/' . $name;
-    
-        } elseif ($request->input('check') === "No change") {
-            // Conserver l’image actuelle
-            $user->avatar = $user->avatar;
-        } else {
-            // Supprimer l’image si non conservée et non remplacée
-            if ($user->avatar && Storage::exists('public/' . $user->avatar)) {
-                Storage::delete('public/' . $user->avatar);
-            }
-            $user->avatar = null;
-        }
-    
-        // Sauvegarde
-        $user->save();
-    
-        return redirect()->route("admin.profile")->with('success', 'Profile updated successfully');
-    }
-    
+{
+    $user = auth()->user();
 
-    //data of client
-    public function listclient(){
-        $message =message::query()->select()->orderBy('created_at','desc')->get();
-        $clients = User::Where("role","client")->count();
-        $products = ProductModel::select("*")->count();
-        $orderliv=order::query()->select('id')->where('statuscmd','=','livree')->count();
-        $orders=order::query()->select('id')->where('statuscmd','=','En attente')->count();
-        $client=User::query()->select("*")->where('role','=','client')->Where('status','=','active')->paginate(5);
-        return view('client.listC',['client'=>$client,'orderliv'=>$orderliv,'orders'=>$orders,'message'=>$message,'clients'=>$clients,'products'=>$products]);
+    // Validation des données
+    $validated = $request->validate([
+        'name' => 'required',
+        'bithdate' => 'required|date',
+        'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5048',
+        'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
+        'adriss' => 'required',
+        'city' => 'required',
+        'contry' => 'required',
+        'pinecode' => 'required',
+        'phone' => 'required',
+        'password' => 'nullable|confirmed', // Permet de ne pas exiger le mot de passe
+    ]);
+
+    // Remplir uniquement les champs autres que le mot de passe
+    $user->fill(array_filter($validated, function ($key) {
+        return $key !== 'password';
+    }, ARRAY_FILTER_USE_KEY));
+
+    // Mettre à jour le mot de passe uniquement s'il est fourni
+    if ($request->filled('password')) {
+        $user->password = Hash::make($request->password);
     }
+
+    if ($request->hasFile('avatar')) {
+        // Supprimer l'ancien avatar s'il existe
+        if ($user->avatar && Storage::exists(str_replace('storage/', 'public/', $user->avatar))) {
+            Storage::delete(str_replace('storage/', 'public/', $user->avatar));
+        }
+
+        $file = $request->file("avatar");
+        $name = "avatar_" . time() . "_" . $user->id . "." . $file->extension();
+        Storage::putFileAs('public/avatars', $file, $name);
+        $user->avatar = 'storage/avatars/' . $name; // Chemin complet pour l'URL publique
+    } elseif ($request->input('check') === "removed") {
+        // Supprimer l'avatar si l'utilisateur clique sur "remove"
+        if ($user->avatar && Storage::exists(str_replace('storage/', 'public/', $user->avatar))) {
+            Storage::delete(str_replace('storage/', 'public/', $user->avatar));
+        }
+        $user->avatar = null;
+    }
+
+    $user->save();
+
+    return redirect()->route("admin.profile")->with('success', 'Profil mis à jour avec succès');
+}
+    public function listclient()
+    {
+        return view('client.listC', [
+            'client' => User::where('role', 'client')->where('status', 'active')->paginate(5),
+            'clients' => User::where("role", "client")->count(),
+            'products' => ProductModel::count(),
+            'orderliv' => Order::where('statuscmd', 'livree')->count(),
+            'orders' => Order::where('statuscmd', 'En attente')->count(),
+            'message' => Message::latest()->get(),
+        ]);
+    }
+
     public function serchclinet(Request $request)
     {
-        $products = ProductModel::select("*")->count();
-        $orderliv=order::query()->select('id')->where('statuscmd','=','livree')->count();
-        $orders=order::query()->select('id')->where('statuscmd','=','En attente')->count();
-        $clients=User::query()->select("*")->where('role','=','client')->Where('status','=','active')->paginate(5);
-        $message =message::query()->select()->orderBy('created_at','desc')->get();
         $search = $request->search;
-        $client = User::query()
-            ->where('status','=','active')
-            ->where('role','=','client')
-            ->where('name', "like", "%{$search}%")
-            ->orWhere('phone', 'like', "%{$search}%")
-            ->orWhere('adriss', 'like', "%{$search}%")
-            ->orderby('id', 'ASC')->paginate(2);
-        if ($client) {
-            return view('client.listC', ['client' => $client,'orderliv'=>$orderliv,'orders'=>$orders,'message'=>$message,'clients'=>$clients,'products'=>$products]);
-        }
-    }
 
-    // ajouter list noir des client
-    public function listnoir($id){
-        $products = ProductModel::select("*")->count();
-        $orderliv=order::query()->select('id')->where('statuscmd','=','livree')->count();
-        $orders=order::query()->select('id')->where('statuscmd','=','En attente')->count();
-        $clients=User::query()->select("*")->where('role','=','client')->Where('status','=','active')->paginate(5);
-        $message =message::query()->select()->orderBy('created_at','desc')->get();
-        $client = User::query()->select("*")->where('id',$id);
-        if($client->status ='active'){
-            $client->update(['status'=>'desactive']);
-            return redirect(route('admin.list'));
-        }
-    }
+        $client = User::where('role', 'client')
+            ->where('status', 'active')
+            ->where(function ($query) use ($search) {
+                $query->where('name', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('adriss', 'like', "%{$search}%");
+            })
+            ->paginate(5);
 
-    //list noir des client
-    public function listnC(){
-        $message =message::query()->select()->orderBy('created_at','desc')->get();
-        $clients = User::Where("role","client")->count();
-        $products = ProductModel::select("*")->count();
-        $orderliv=order::query()->select('id')->where('statuscmd','=','livree')->count();
-        $orders=order::query()->select('id')->where('statuscmd','=','En attente')->count();
-        $client=User::query()->select("*")->where('role','=','client')->Where('status','=','desactive')->paginate(5);
-        return view('client.listnc',['client'=>$client,'message'=>$message,'orderliv'=>$orderliv,'orders'=>$orders,'clients'=>$clients,'products'=>$products]);
-    }
-
-    //recherche client list noir
-    public function clientlistnoir(Request $request){
-        $products = ProductModel::select("*")->count();
-        $orderliv=order::query()->select('id')->where('statuscmd','=','livree')->count();
-        $orders=order::query()->select('id')->where('statuscmd','=','En attente')->count();
-        $clients=User::query()->select("*")->where('role','=','client')->Where('status','=','active')->paginate(5);
-        $message =message::query()->select()->orderBy('created_at','desc')->get();
-        $search = $request->search;
-        $client = User::query()
-            ->where('role','=','client')
-            ->where('status','=','desactive')
-            ->where('name', "like", "%{$search}%")
-            ->orWhere('phone', 'like', "%{$search}%")
-            ->orWhere('adriss', 'like', "%{$search}%")
-
-            ->orderby('id', 'ASC')->paginate(2);
-        if ($client) {
-            return view('client.listnc', ['client' => $client,'orderliv'=>$orderliv,'orders'=>$orders,'message'=>$message,'clients'=>$clients,'products'=>$products]);
-        }
-    }
-
-
-    //ajouer a la list des client
-    public function listC($id){
-        $client = User::query()->select("*")->where('id',$id);
-        if($client->status ='desactive'){
-            $client->update(['status'=>'active']);
-            return redirect(route('admin.list'));
-        }
-    }
-
-    //get message
-    public  function getmessage(){
-        $message =message::query()->select()->orderBy('created_at','desc')->get();
-        return view('admin.main',['message'=>$message]);
-    }
-
-    public function toutmessage(){
-        $clients = User::Where("role","client")->count();
-        $products = ProductModel::select("*")->count();
-        $orderliv=order::query()->select('id')->where('statuscmd','=','livree')->count();
-        $orders=order::query()->select('id')->where('statuscmd','=','En attente')->count();
-        $messages = message::query()->select()->orderBy('created_at','desc')->get();
-        return view('message.message',['message'=>$messages,
-            'products'=>$products,
-            'orderliv'=>$orderliv,
-            'orders'=>$orders,
-            'clients'=>$clients
+        return view('client.listC', [
+            'client' => $client,
+            'clients' => User::where("role", "client")->count(),
+            'products' => ProductModel::count(),
+            'orderliv' => Order::where('statuscmd', 'livree')->count(),
+            'orders' => Order::where('statuscmd', 'En attente')->count(),
+            'message' => Message::latest()->get(),
         ]);
     }
 
-        public function clientDetails($id)
-        {
-            $message = message::query()->select()->orderBy('created_at', 'desc')->get();
-            // Retrieve user details
-            $user = User::findOrFail($id);
-            
-            // Retrieve both pending and delivered orders
-            $orders = Order::where('name', $user->id)->where('statuscmd', '=', 'En attente')->get();
-            $orderliv = Order::where('name', $user->id)->where('statuscmd', '=', 'livree')->get();
-            
-            // Pass the user details and orders to the view
-            return view('client.clientDetails', [
-                'message' => $message,
-                'user' => $user,
-                'orders' => $orders,
-            ]);
+    public function listnoir($id)
+    {
+        $client = User::find($id);
+        if ($client && $client->status == 'active') {
+            $client->update(['status' => 'desactive']);
         }
-    
-    
+        return redirect()->route('admin.list');
+    }
+
+    public function listnC()
+    {
+        return view('client.listnc', [
+            'client' => User::where('role', 'client')->where('status', 'desactive')->paginate(5),
+            'clients' => User::where("role", "client")->count(),
+            'products' => ProductModel::count(),
+            'orderliv' => Order::where('statuscmd', 'livree')->count(),
+            'orders' => Order::where('statuscmd', 'En attente')->count(),
+            'message' => Message::latest()->get(),
+        ]);
+    }
+
+    public function clientlistnoir(Request $request)
+    {
+        $search = $request->search;
+
+        $client = User::where('role', 'client')
+            ->where('status', 'desactive')
+            ->where(function ($query) use ($search) {
+                $query->where('name', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('adriss', 'like', "%{$search}%");
+            })
+            ->paginate(5);
+
+        return view('client.listnc', [
+            'client' => $client,
+            'clients' => User::where("role", "client")->count(),
+            'products' => ProductModel::count(),
+            'orderliv' => Order::where('statuscmd', 'livree')->count(),
+            'orders' => Order::where('statuscmd', 'En attente')->count(),
+            'message' => Message::latest()->get(),
+        ]);
+    }
+
+    public function listC($id)
+    {
+        $client = User::find($id);
+        if ($client && $client->status == 'desactive') {
+            $client->update(['status' => 'active']);
+        }
+        return redirect()->route('admin.list');
+    }
+
+    public function getmessage()
+    {
+        return view('admin.main', [
+            'message' => Message::latest()->get()
+        ]);
+    }
+
+    public function toutmessage()
+    {
+        return view('message.message', [
+            'message' => Message::latest()->get(),
+            'products' => ProductModel::count(),
+            'orderliv' => Order::where('statuscmd', 'livree')->count(),
+            'orders' => Order::where('statuscmd', 'En attente')->count(),
+            'clients' => User::where("role", "client")->count(),
+        ]);
+    }
+
+    public function clientDetails($id)
+    {
+        $user = User::findOrFail($id);
+
+        return view('client.clientDetails', [
+            'message' => Message::latest()->get(),
+            'user' => $user,
+            'orders' => Order::where('name', $user->id)->where('statuscmd', 'En attente')->get(),
+            'orderliv' => Order::where('name', $user->id)->where('statuscmd', 'livree')->get(),
+        ]);
+    }
 }
