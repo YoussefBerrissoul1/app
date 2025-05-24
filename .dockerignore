@@ -5,3 +5,4 @@ storage/logs
 .git
 .gitignore
 docker-compose.yml
+public/storage
